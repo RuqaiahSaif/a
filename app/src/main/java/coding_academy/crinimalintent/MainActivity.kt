@@ -24,6 +24,7 @@ class MainActivity : AppCompatActivity(),CrimeListFragment.CallBacks  {
 
         }
 
+
     override fun onItemSelected(crimeId: UUID) {
         val fragment = CrimeFragment.newInstance(crimeId)
         val fm = supportFragmentManager

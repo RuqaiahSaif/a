@@ -1,6 +1,7 @@
 package coding_academy.crinimalintent
 
 import androidx.lifecycle.ViewModel
+import java.io.File
 
 class CrimeListViewModel: ViewModel() {
 
@@ -9,12 +10,8 @@ class CrimeListViewModel: ViewModel() {
     fun addCrime(crime: Crime) {
         crimeRepository.addCrime(crime)
     }
-    fun check_data ():Boolean{
-
-        if (crimeListLiveData.value==null)
-      return  false
-     else   return true
-
+    fun getPhotoFile(crime: Crime): File {
+        return crimeRepository!!.getPhotoFile(crime)
     }
 
 }

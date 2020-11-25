@@ -2,34 +2,41 @@ package coding_academy.crinimalintent
 
 import android.content.ContentValues.TAG
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.*
-import android.widget.*
-import androidx.core.view.isVisible
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.LiveData
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProviders
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import coding_academy.crinimalintent.CrimeListFragment.Companion.newInstance
-import kotlinx.android.synthetic.main.crime_list_fragment.*
+import java.io.File
 import java.text.DateFormat
 import java.util.*
 
 private const val TAG = "CrimeListFragment"
 
 class CrimeListFragment: Fragment() {
+    private lateinit var photoFile: File
     private lateinit var crimeRecyclerView: RecyclerView
-    private var adapter:  CrimeAdapter? =  CrimeAdapter()
+    private var adapter:  CrimeAdapter? =  CrimeAdapter(emptyList())
     private lateinit var add: Button
     private lateinit var no_crime: TextView
-
+    private lateinit var crime: Crime
     private val crimeListViewModel: CrimeListViewModel by lazy {
         ViewModelProviders.of(this).get(CrimeListViewModel::class.java)
     }
-
+    private val crimeDetailViewModel: CrimeDetailViewModel by lazy {
+        ViewModelProviders.of(this).get(CrimeDetailViewModel::class.java)
+    }
     var callBacks:CallBacks?=null
 interface CallBacks{
     fun onItemSelected(crimeId: UUID)
@@ -70,26 +77,19 @@ interface CallBacks{
         add = view.findViewById(R.id.add1) as Button
         no_crime = view.findViewById(R.id.no_crime) as TextView
 
-     /*   if (crimeListViewModel.check_data() == true) {
-            add.visibility = View.GONE
-            no_crime.visibility = View.GONE
 
-        } else {
-            add.visibility = View.VISIBLE
-            no_crime.visibility = View.VISIBLE
-
-
-        }*/
         return view
 
     }
     private fun updateUI(crimes: List<Crime>) {
 
-        adapter = CrimeAdapter()
+        adapter = CrimeAdapter(crimes)
         crimeRecyclerView.adapter = adapter
+
         val adapterTemp = crimeRecyclerView.adapter as CrimeAdapter
         adapterTemp.submitList(crimes)
     }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         crimeListViewModel.crimeListLiveData.observe(
@@ -97,6 +97,7 @@ interface CallBacks{
             Observer { crimes ->
                 crimes?.let {
                     Log.i(TAG, "Got crimes ${crimes.size}")
+
                     updateUI(crimes)
                 }
                 })
@@ -113,8 +114,8 @@ interface CallBacks{
                     private lateinit var crime: Crime
                     val titleTextView: TextView = itemView.findViewById(R.id.crime_title)
                     val dateTextView: TextView = itemView.findViewById(R.id.crime_date)
-                    private val solvedImageView1: ImageView =
-                        itemView.findViewById(R.id.crime_solved)
+                    private var crimeImageView: ImageView = itemView.findViewById(R.id.ImageView)
+                    private val solvedImageView1: ImageView = itemView.findViewById(R.id.crime_solved)
 
                     init {
                         itemView.setOnClickListener(this)
@@ -123,12 +124,14 @@ interface CallBacks{
                     override fun bind(crime: Crime) {
                         this.crime = crime
                         titleTextView.text = this.crime.title
-                        dateTextView.text =
-                            DateFormat.getTimeInstance(DateFormat.FULL).format(this.crime.date)
-                                .toString()
+
+                        dateTextView.text = DateFormat.getTimeInstance(DateFormat.FULL).format(this.crime.date).toString()
+                        
                         solvedImageView1.visibility = if (crime.isSolved) {
                             View.VISIBLE
                         } else {
+
+                            image_crime(crimeImageView , crime)
                             View.GONE
                         }
 
@@ -173,7 +176,7 @@ interface CallBacks{
                     }
                 }
 
-                private inner class CrimeAdapter() :
+                private inner class CrimeAdapter(var crimes: List<Crime>) :
                     androidx.recyclerview.widget.ListAdapter<Crime , RecyclerView.ViewHolder>(CrimeDiffUtil()) {
 
                     override fun onCreateViewHolder(
@@ -193,9 +196,6 @@ interface CallBacks{
 
 
 
-
-
-
                    override fun getItemViewType(position: Int): Int {
                     val type= when(getItem(position).isSolved){
               true ->1
@@ -203,6 +203,17 @@ interface CallBacks{
                     }
 
                  return type
+                    }
+                    override fun getItemCount(): Int {
+                        if(crimes.size<=0){
+                            add.visibility = View.VISIBLE
+                            no_crime.visibility = View.VISIBLE
+                        }else{
+                            add.visibility = View.GONE
+                            no_crime.visibility = View.GONE
+                        }
+                        return crimes.size
+
                     }
 
                     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
@@ -212,7 +223,10 @@ interface CallBacks{
                                 false->(holder as CrimeHolder).bind(crime)
                         }
                     }
+
+
                 }
+
     class CrimeDiffUtil: DiffUtil.ItemCallback<Crime>(){
         override fun areItemsTheSame(oldItem: Crime, newItem: Crime): Boolean {
             return oldItem.id === newItem.id
@@ -251,6 +265,22 @@ interface CallBacks{
 
 
         }
+
+
     }
+    fun image_crime(crimeImageView: ImageView, crime: Crime) {
+        photoFile = crimeListViewModel.getPhotoFile(crime)
+        if (photoFile.exists()) {
+            var pictureUtils = PictureUtils()
+            val bitmap = pictureUtils.getScaledBitmap(
+                photoFile.path ,
+                requireActivity()
+            )
+            crimeImageView.setImageBitmap(bitmap)
+        } else
+            crimeImageView.setImageDrawable(null)
+
+    }
+
 }
 

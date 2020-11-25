@@ -6,6 +6,7 @@ import androidx.room.Room
 import database.CrimeDatabase
 import database.migration_1_2
 import database.migration_2_3
+import java.io.File
 import java.util.*
 import java.util.concurrent.Executors
 
@@ -20,6 +21,9 @@ private const val DATABASE_NAME = "crime-database"
             .build()
         private val crimeDao = database.crimeDao()
         private val executor = Executors.newSingleThreadExecutor()
+        private val filesDir = context.applicationContext.filesDir
+
+        fun getPhotoFile(crime: Crime): File = File(filesDir, crime.photoFileName)
 
         fun getCrimes(): LiveData<List<Crime>> = crimeDao.getCrimes()
         fun getCrime(id: UUID): LiveData<Crime?> = crimeDao.getCrime(id)
@@ -28,12 +32,12 @@ private const val DATABASE_NAME = "crime-database"
                 crimeDao.updateCrime(crime)
             }
         }
+
         fun addCrime(crime: Crime) {
             executor.execute {
                 crimeDao.addCrime(crime)
             }
         }
-
         companion object {
             private var INSTANCE: CrimeRepository? = null
             fun initialize(context: Context) {

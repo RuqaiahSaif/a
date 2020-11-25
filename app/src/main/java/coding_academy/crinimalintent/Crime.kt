@@ -11,8 +11,10 @@ import java.util.*
   var isSolved: Boolean = false,
  var suspect: String = "",
 var phone_number:String=""
+
 )
 
 {
-
+ val photoFileName
+  get() = "IMG_$id.jpg"
 }

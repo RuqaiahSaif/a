@@ -1,25 +1,28 @@
 package coding_academy.crinimalintent
 import android.app.Activity
+import android.app.ProgressDialog.show
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.net.Uri
 import android.os.Bundle
 import android.provider.ContactsContract
+import android.provider.MediaStore
 import android.text.Editable
 import android.text.TextWatcher
 import android.text.format.DateFormat
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
-import android.widget.CheckBox
-import android.widget.EditText
-import android.widget.TextView
+import android.widget.*
+import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProviders
+import java.io.File
+import java.text.DateFormat.getDateInstance
 import java.util.*
+import java.text.SimpleDateFormat
 
 private const val ARG_CRIME_ID = "crime_id"
 private const val DIALOG_DATE = "DialogDate"
@@ -28,6 +31,9 @@ private const val REQUEST_DATE = 0
 private const val REQUEST_TIME = 1
 private const val REQUEST_CONTACT = 1
 private const val DATE_FORMAT = "EEE, MMM, dd"
+private const val REQUEST_PHOTO = 2
+
+
 
  class CrimeFragment: Fragment() ,DataPicketFragment.Callbacks,TimePickerFragment.Callbacks {
      private lateinit var crime: Crime
@@ -38,8 +44,11 @@ private const val DATE_FORMAT = "EEE, MMM, dd"
      private lateinit var reportButton: Button
      private lateinit var suspectButton: Button
      private lateinit var phoneButton: Button
-
-
+     private lateinit var photoButton: ImageButton
+     private lateinit var photoView: ImageView
+     private lateinit var photoFile: File
+     private lateinit var photoUri: Uri
+     private var picture=PictureUtils()
      private val crimeListViewModel: CrimeListViewModel by lazy {
          ViewModelProviders.of(this).get(CrimeListViewModel::class.java)
      }
@@ -71,6 +80,9 @@ private const val DATE_FORMAT = "EEE, MMM, dd"
          reportButton = view.findViewById(R.id.crime_report) as Button
          suspectButton = view.findViewById(R.id.crime_suspect) as Button
          phoneButton= view.findViewById(R.id.phone_number) as Button
+         photoButton = view.findViewById(R.id.crime_camera) as ImageButton
+         photoView = view.findViewById(R.id.crime_photo) as ImageView
+
 
          /*       dateButton.apply {
             text = crime.date.toString()
@@ -85,11 +97,13 @@ private const val DATE_FORMAT = "EEE, MMM, dd"
 
      private fun updateUI() {
          titleText.setText(crime.title)
-         dateButton.text = crime.date.toString()
+                 dateButton.text = getDateInstance().format(crime.date)
+       // dateButton.text = crime.date.toString()
          solvedCheckBox.isChecked = crime.isSolved
          if (crime.suspect.isNotEmpty()) {
              suspectButton.text = crime.suspect
          }
+         updatePhotoView()
 
      }
      override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -116,8 +130,14 @@ private const val DATE_FORMAT = "EEE, MMM, dd"
                      crime.phone_number = phone_number
                      crimeDetailViewModel.saveCrime(crime)
                      suspectButton.text = suspect
+                     phoneButton.text = phone_number
                  }
              }
+             requestCode == REQUEST_PHOTO -> {
+                 requireActivity().revokeUriPermission(photoUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                 updatePhotoView()
+             }
+
          }
      }
 
@@ -129,6 +149,10 @@ private const val DATE_FORMAT = "EEE, MMM, dd"
              Observer { crime ->
                  crime?.let {
                      this.crime = crime
+                     photoFile = crimeDetailViewModel.getPhotoFile(crime)
+                             photoUri = FileProvider.getUriForFile(requireActivity(),
+                                 "coding_academy.crinimalintent.fileprovider",
+                                 photoFile)
                      updateUI()
                  }
              })
@@ -219,14 +243,41 @@ private const val DATE_FORMAT = "EEE, MMM, dd"
                  isEnabled = false
              }
          }
-         phoneButton.setOnClickListener  {
-             val number = crime.phone_number
-             phoneButton.text = number
-             val call = Uri.parse("tel:$number")
-             val surf = Intent(Intent.ACTION_DIAL, call)
-             startActivity(surf)
+         photoButton.apply {
+             val packageManager: PackageManager = requireActivity().packageManager
+             val captureImage = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+             val resolvedActivity: ResolveInfo? =
+                 packageManager.resolveActivity(captureImage,
+                     PackageManager.MATCH_DEFAULT_ONLY)
+             if (resolvedActivity == null) {
+                 isEnabled = false
+             }
+             setOnClickListener {
+                 captureImage.putExtra(MediaStore.EXTRA_OUTPUT, photoUri)
+                 val cameraActivities: List<ResolveInfo> =
+                     packageManager.queryIntentActivities(captureImage,
+                         PackageManager.MATCH_DEFAULT_ONLY)
+                 for (cameraActivity in cameraActivities) {
+                     requireActivity().grantUriPermission(
+                         cameraActivity.activityInfo.packageName,
+                         photoUri,
+                         Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                  }
+                 startActivityForResult(captureImage, REQUEST_PHOTO)
+             }
          }
+         photoView.setOnClickListener {
+             zoomDialoge.newInstance(photoFile).apply {
+                 show(this@CrimeFragment.requireFragmentManager() , "input")
+             }
+
+         }
+     }
+     override fun onDetach() {
+         super.onDetach()
+         requireActivity().revokeUriPermission(photoUri,
+             Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+     }
 
 
 
@@ -277,6 +328,15 @@ override fun onStop() {
                  crime.title, dateString, solvedString, suspect
              )
          }
+     private fun updatePhotoView() {
+         if (photoFile.exists()) {
+             val bitmap =picture.getScaledBitmap(photoFile.path, requireActivity())
+             photoView.setImageBitmap(bitmap)
+         } else {
+             photoView.setImageDrawable(null)
+         }
+     }
+
 
  }
 
